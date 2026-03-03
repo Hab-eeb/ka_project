@@ -1,5 +1,19 @@
+# Python bytecode
+__pycache__/
+*.py[cod]
+
+# Environments / API keys
 .kavenv/ 
 .env 
+.venv/
+venv/
+env/
+
+# Database
+*.db
+
+
+#Data files 
 *.json
 *.md
 *.txt
