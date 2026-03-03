@@ -1,3 +1,5 @@
 .kavenv/ 
 .env 
 *.json
+*.md
+*.txt
