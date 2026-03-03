@@ -347,7 +347,7 @@ Algebra is a branch of mathematics that substitutes letters (variables) for numb
 #topic = 'algebra'
 
 
-def question_gen_agent(topic= '', topic_corpus =''):
+def question_agent(topic= '', topic_corpus =''):
     response = client.models.generate_content( 
 
             model = "gemini-2.5-flash-lite",
@@ -365,23 +365,23 @@ def question_gen_agent(topic= '', topic_corpus =''):
     return {"parsed_response":response.parsed, "metadata": response.usage_metadata}
 
 
-# Function calls 
-topic = 'General Artificial Intelligence'
-data_research = safe_agent_call(lambda:research_agent(topic= topic)) 
-topic_corpus = data_research['response_text']
+# # Function calls 
+# topic = 'General Artificial Intelligence'
+# data_research = safe_agent_call(lambda:research_agent(topic= topic)) 
+# topic_corpus = data_research['response_text']
 
-with open("corpus_output_4.md", "w", encoding="utf-8") as f:
-    f.write(topic_corpus)
+# with open("corpus_output_4.md", "w", encoding="utf-8") as f:
+#     f.write(topic_corpus)
     
 
-data = safe_agent_call(lambda: question_gen_agent(topic=topic,topic_corpus=topic_corpus ))
+# data = safe_agent_call(lambda: question_gen_agent(topic=topic,topic_corpus=topic_corpus ))
 
-response_parsed = data['parsed_response']
+# response_parsed = data['parsed_response']
 
-with open("course_output_2.json", "w", encoding="utf-8") as f:
-    json.dump(response_parsed, f, ensure_ascii=False, indent=2)
+# with open("course_output_2.json", "w", encoding="utf-8") as f:
+#     json.dump(response_parsed, f, ensure_ascii=False, indent=2)
 
 
-print("Research Agent Metadata", data_research['metadata'])
-print("Question Agent Metadata", data['metadata'])
+# print("Research Agent Metadata", data_research['metadata'])
+# print("Question Agent Metadata", data['metadata'])
     
