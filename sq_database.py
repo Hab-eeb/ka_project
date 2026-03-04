@@ -10,12 +10,12 @@ def init_db():
     cursor = conn.cursor()
 
     #Table for raw corpus 
-
     cursor.execute( '''
         CREATE TABLE IF NOT EXISTS corpus (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             topic TEXT,
-            corpus_text TEXT
+            corpus_text TEXT, 
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP       
                    )
     
     ''')
@@ -24,6 +24,7 @@ def init_db():
     cursor.execute('''
         CREATE TABLE IF NOT EXISTS questions(
             id INTEGER PRIMARY KEY AUTOINCREMENT, 
+            corpus_id INTEGER, --Link to corpus table
             topic TEXT,
             day_number INTEGER,
             difficulty TEXT,
@@ -31,14 +32,32 @@ def init_db():
             question_text TEXT,
             options TEXT, --Stored as JSON string
             correct_answer TEXT,
-            explanation TEXT 
+            explanation TEXT, 
+            FOREIGN KEY (corpus_id) REFERENCES corpus (id)
                    )
     ''')
     conn.commit()
     conn.close()
 
-def save_questions_to_db(question_data: dict):
-    """ Saves the entire Question Schema into the database. """
+def save_corpus_to_db(topic: str, corpus: str) -> int:
+    """ Saves the corpus and topic and returns the rowid to link with question data"""
+    conn = sqlite3.connect(DB_NAME)
+    cursor = conn.cursor()
+
+    cursor.execute('''
+       INSERT INTO corpus (topic, corpus_text) VALUES (?,?) ''',
+       (topic,corpus)
+       )
+    last_id = cursor.lastrowid  # Gets the id of the row just inserted
+
+    conn.commit()
+    conn.close()
+
+    return last_id
+
+
+def save_questions_to_db(question_data: dict, corpus_id: int):
+    """ Saves the entire Question Schema into the database, linked to the corpus"""
 
     conn = sqlite3.connect(DB_NAME)
     cursor = conn.cursor()
@@ -52,9 +71,10 @@ def save_questions_to_db(question_data: dict):
         for q in day['questions']:
             cursor.execute('''
             INSERT INTO questions 
-            (topic, day_number, difficulty, subtopic, question_text, options, correct_answer, explanation)
-            VALUES (?,?,?,?,?,?,?,?) ''', 
+            (corpus_id, topic, day_number, difficulty, subtopic, question_text, options, correct_answer, explanation)
+            VALUES (?,?,?,?,?,?,?,?,?) ''', 
             ( 
+                corpus_id, # Foreign Key
                 topic_name,
                 day_num,
                 diff_level,

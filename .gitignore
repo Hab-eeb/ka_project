@@ -12,7 +12,6 @@ env/
 # Database
 *.db
 
-
 #Data files 
 *.json
 *.md
