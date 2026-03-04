@@ -1,43 +1,81 @@
-🧠 AI-Driven Learning Curriculum Generator (WIP)
-A modular Python-based pipeline that transforms raw topic data into structured, multi-day learning curriculums and practice questions using the Google Gemini 2.0 SDK.
+### AI-Driven Learning Curriculum Generator (WIP)
 
-🚀 Project Overview
-This project automates the creation of educational content. It uses a "Research Agent" to build a knowledge corpus and a "Question Agent" to generate structured assessments. All data is persisted in a relational database to ensure traceability between the source material and the generated questions.
+A modular Python-based pipeline that transforms raw topic data into structured, multi-day learning curriculums and practice questions using the **Google Gemini (new SDK)**.
 
-🛠️ Tech Stack
-Language: Python 3.10+
-AI Model: Google Gemini (gemini-2.0-flash)
-SDK: New Google Gen AI Python SDK (from google import genai)
-Database: SQLite (Relational storage for corpus and Q&A pairs)
-Data Validation: Pydantic / TypedDict for structured JSON enforcement
-📂 File Structure
-main.py: The central orchestrator. Handles the execution flow: initializing the database, triggering agents, and saving outputs.
-agents.py: Contains the logic for AI agents. Includes custom retry logic to handle 503 Service Unavailable errors during high-demand periods.
-sq_database.py: The data persistence layer. Manages SQLite schema creation and relational inserts.
-ka_data.db: The local SQLite database (contains the generated curriculum and questions).
+#### Project overview
+This project automates the creation of educational content:
 
-📊 Database Architecture
-The project uses a Foreign Key relationship to link questions back to their specific source corpus. This allows for versioning—if the corpus is updated, we can track exactly which questions were generated from which version.
+- A corpus (research) step produces a topic-specific learning corpus (Markdown).
+- A question-generation step produces a structured, multi-day curriculum of MCQ-style questions.
+- Outputs are persisted in **SQLite** so every generated question set can be traced back to the exact corpus version it came from.
 
-corpus Table: Stores id, topic, content, and timestamp.
-questions Table: Stores id, corpus_id (FK), day_number, difficulty, question_text, options (JSON-serialized), correct_answer, and explanation_gist.
-🌟 Key Features
-Structured Output: Uses Gemini’s response_schema to ensure the AI always returns valid, parsable JSON matching the project's TopicSchema.
-Resilient API Calls: Implements a "Safe Call" wrapper with exponential backoff to handle API timeouts and server-side spikes.
-Relational Persistence: Instead of loose JSON files, data is normalized into SQLite, making it ready for future analytics or a web frontend.
-🛠️ Setup & Usage
-Install Dependencies:
-bash
-Copy
+#### Tech stack
+- **Python**
+- **Google Gemini** via the new SDK (`from google import genai`)
+- **SQLite** for persistence (`ka_data.db`)
+- **Structured output** using typed schemas (e.g., `TypedDict`) and JSON
+
+#### Repository layout
+- `main.py` — Orchestrates the workflow (init DB → run agents → save results)
+- `agents.py` — Agent calls to Gemini + reliability logic (e.g., retry/backoff on 503 high-demand errors)
+- `sq_database.py` — SQLite schema + insert helpers
+- `ka_data.db` — Local SQLite database (generated; should be gitignored)
+- `ka_data_prev.db` — Previous DB snapshot (generated; should be gitignored)
+- `corpus_output_*.md` — Generated corpus versions (generated artifacts)
+- `course_output*.json` — Sample structured outputs from the question agent (generated artifacts)
+
+#### Data model (high-level)
+Two primary tables:
+
+- `corpus`
+  - `id` (PK)
+  - `topic`
+  - `content`
+  - `created_at`
+
+- `questions`
+  - `id` (PK)
+  - `corpus_id` (FK → `corpus.id`)
+  - `topic`
+  - `day_number`
+  - `difficulty`
+  - `subtopic`
+  - `question_text`
+  - `options` (stored as JSON string)
+  - `correct_answer`
+  - `explanation`
+
+This design supports multiple corpora over time (even for the same topic) while keeping question sets traceable via `corpus_id`.
+
+#### Running locally (typical)
+1. Install dependencies (example):
+
+```bash
 pip install google-genai pydantic
-Configure API Key:
-Ensure your Gemini API key is available in your environment.
-Run the Pipeline:
-bash
-Copy
+```
+
+2. Configure your Gemini API key (do not commit secrets).
+3. Run the pipeline:
+
+```bash
 python main.py
-📈 Roadmap
- Automated Delivery: Integration with email services to send "Daily Questions" to learners.
- Respondent Module: Tables to store user answers and calculate scores.
- Analytics Agent: An agent to review the database and identify gaps in the generated curriculum.
-Note: This project is currently in active development. Generated artifacts like .db and __pycache__ are excluded from version control via .gitignore.
+```
+
+#### Notes on generated artifacts / gitignore
+`.gitignore` applies only to **untracked** files. If you already committed artifacts (DBs, outputs, `__pycache__`), remove them from tracking with:
+
+```bash
+git rm -r --cached __pycache__
+git rm --cached *.db
+git rm --cached course_output*.json corpus_output_*.md
+```
+
+Then commit and push.
+
+#### Roadmap
+- Store user/respondent answers and scoring
+- Add analytics on question quality, topic coverage, and difficulty progression
+- Add email sending / daily delivery logic
+
+#### Status
+Work in progress. Core generation + persistence + traceability are in place; evaluation and delivery features are planned.
