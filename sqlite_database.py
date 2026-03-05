@@ -36,6 +36,24 @@ def init_db():
             FOREIGN KEY (corpus_id) REFERENCES corpus (id)
                    )
     ''')
+
+    #Table for user responses 
+
+    cursor.execute('''
+        CREATE TABLE IF NOT EXISTS user_responses(
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            question_id INTEGER, --Link to question
+            user_email TEXT,
+            selected_option TEXT,
+            is_correct BOOLEAN,
+            responded_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP, 
+            FOREIGN KEY (question_id) REFERENCES questions (id)                            
+                   )
+    ''')
+
+
+
+
     conn.commit()
     conn.close()
 
@@ -88,6 +106,24 @@ def save_questions_to_db(question_data: dict, corpus_id: int):
     conn.commit()
     conn.close()
 
+def save_user_responses(question_id: int, email: str, users_answer:str, is_correct: bool):
+    """Saves the users response into the db"""
+
+    conn = sqlite3.connect(DB_NAME)
+    cursor = conn.cursor()
+
+    cursor.execute('''
+        INSERT INTO user_response (question_id,user_email, selected_option, is_correct)
+        VALUES (?,?,?,?)''', 
+        (question_id,email,users_answer,is_correct)
+    )
+
+    conn.commit()
+    conn.close()
+
+if __name__ == "__main__":
+    init_db()
+    print("DB initialized")
 
 
 

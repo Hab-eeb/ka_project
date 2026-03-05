@@ -1,5 +1,5 @@
 from agents import safe_agent_call, research_agent, question_agent
-from sq_database import init_db, save_questions_to_db, save_corpus_to_db
+from ka_project.sqlite_database import init_db, save_questions_to_db, save_corpus_to_db
 
 def main():
     # Db setup 
