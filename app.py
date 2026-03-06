@@ -23,8 +23,8 @@ def check_answer():
     #2 Lookup the question in the database 
     conn = get_db_connection()
     question = conn.execute('''
-        SELECT * FROM questions WHERE id = ?, 
-        ''',   (q_id,)
+        SELECT * FROM questions WHERE id = ? 
+        ''',   (q_id)
         
         ).fetchone()
     if not question:
@@ -36,6 +36,35 @@ def check_answer():
 
     #4 Map the letter (A,B,C,D) to the list index (0,1,2,3)
     letter_to_index = {'A': 0, 'B':1, 'C': 2, 'D':3}
+    index = letter_to_index.get(user_answer)
+
+    #5 Get the actual answer
+    if index is not None and index < len(options_list):
+        user_answer_text = options_list[index]
+    else:
+        return "Invalid Choice", 400
+    
+    #6 Compare full text 
+    is_correct = (user_answer_text == question['correct_answer'])
+
+    # Save the response into the db 
+    conn.execute ('''
+        INSERT INTO user_responses (question_id, user_email, selected_option, is_correct) 
+        VALUES (?,?,?,?)
+        ''' , (q_id,user_email,user_answer_text,is_correct)
+                  )
+
+    conn.commit()
+    conn.close()
+
+    return render_template('result.html',
+                           is_correct = is_correct,
+                           correct_answer = question['correct_answer'],
+                           explanation = question['explanation'],
+                           user_answer = user_answer_text
+                           )
 
 
+if __name__ == '__main__':
+    app.run(debug =True, port =5000)
 

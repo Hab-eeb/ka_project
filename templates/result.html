@@ -1,0 +1,37 @@
+<!DOCTYPE html>
+<html>
+<head>
+<title> Result </title>
+
+<style>
+    body {font-family: sans-serif; text-align: center; padding: 50px;}
+    .correct{color : green;}
+    .incorrect{color: red;}
+    .box {border: 1px solid #ccc; padding:20px; display:inline-block ; border-radius: 10px;}
+
+</style>
+</head>
+
+<body>
+    <div class="box">
+        {% if is_correct %} 
+            <h1 class="correct"> Correct! ✅</h1>
+            <p>Your answer : <strong> {{user_answer}}</strong> is correct. Well Done!!! </p>
+        {% else %}
+            <h1 class ="incorrect"> Incorrect ❌</h1>
+            <p> Your answer: <strong>{{user_answer}}</strong></p>
+            <p> The correct answer is : <strong>{{correct_answer}}</strong></p>
+        {% endif %}
+
+        <hr>
+        <h3> Explanation: </h3>
+        <p>{{ explanation }}</p>
+
+        <br>
+
+        <p><em>Your response has been saved</em></p>
+
+    </div>
+</body>
+
+</html>
