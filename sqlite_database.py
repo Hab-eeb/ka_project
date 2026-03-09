@@ -13,7 +13,7 @@ def init_db():
     cursor.execute( '''
         CREATE TABLE IF NOT EXISTS corpus (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
-            topic TEXT,
+            topic TEXT UNIQUE,
             corpus_text TEXT, 
             created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP       
                    )
@@ -33,7 +33,8 @@ def init_db():
             options TEXT, --Stored as JSON string
             correct_answer TEXT,
             explanation TEXT, 
-            FOREIGN KEY (corpus_id) REFERENCES corpus (id)
+            FOREIGN KEY (corpus_id) REFERENCES corpus (id),
+            UNIQUE (corpus_id,day_number, question_text)
                    )
     ''')
 
@@ -53,8 +54,34 @@ def init_db():
                    )
     ''')
 
+    #Table for Curriculum link between user, topic and corpus
 
+    cursor.execute('''
+        CREATE TABLE IF NOT EXISTS curriculums (
+                   id INTEGER PRIMARY KEY AUTOINCREMENT,
+                   topic TEXT UNIQUE NOT NULL, 
+                   corpus_id INTEGER NOT NULL,
+                   total_days INTEGER DEFAULT 30,
+                   created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                   FOREIGN KEY (corpus_id) REFERENCES corpus (id) 
+                   )
+    
+    ''')
 
+    #Table for user - ensuring unique list of users 
+
+    cursor.execute('''
+            CREATE TABLE IF NOT EXISTS users (
+                   id INTEGER PRIMARY KEY AUTOINCREMENT,
+                   email TEXT UNIQUE NOT NULL,
+                   curriculum_id INTEGER NOT NULL,
+                   start_date DATE DEFAULT (date('now')),
+                   current_day INTEGER DEFAULT 1,
+                   is_active INTEGER DEFAULT 1, 
+                   FOREIGN KEY (curriculum_id) REFERENCES curriculums (id)  
+                   )
+
+                ''')
 
     conn.commit()
     conn.close()
@@ -147,13 +174,57 @@ def reset_all_user_responses(email:str):
 
     print(f"Reset: All responses cleared for {email}")
 
+def save_curriculum(topic: str, corpus_id:int, total_days: int= 30) -> int:
+    """ Creates a curriculum linking topic, corpus """
+    conn = sqlite3.connect(DB_NAME)
+    cursor = conn.cursor()
+    cursor.execute('''
+            INSERT OR IGNORE INTO curriculums (topic, corpus_id, total_days)
+                 VALUES (?,?,?)
+                ''', (topic, corpus_id,total_days)
+                 )
+    
+    if cursor.lastrowid:
+        curriculum_id = cursor.lastrowid 
+    else:
+        #Fetch the id whether its present incase of duplicates
+        curriculum_id = cursor.execute('''
+                SELECT id FROM curriculums WHERE topic = ? 
+                ''', (topic,)
+        ).fetchone()[0]
+
+    conn.commit()
+    conn.close()
+    return curriculum_id
+
+def register_user(email: str, curriculum_id: int):
+    """ Registers a new user to a curriculum """
+
+    conn = sqlite3.connect(DB_NAME)
+    conn.execute('''
+            INSERT OR IGNORE INTO users (email,curriculum_id)
+            VALUES (?,?)
+    ''', (email, curriculum_id))
+
+    conn.commit()
+    conn.close()
+
+    print(f"User {email} registered to the curriculum {curriculum_id}")
+
+
+
+
+
+
+
+
 
 
 if __name__ == "__main__":
     init_db()
     print("DB initialized")
 
-    reset_all_user_responses("agbajeh8@gmail.com") #Uncomment when needed
+    #reset_all_user_responses("agbajeh8@gmail.com") #Uncomment when needed
 
 
 
