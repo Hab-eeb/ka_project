@@ -24,7 +24,7 @@ def check_answer():
     conn = get_db_connection()
     question = conn.execute('''
         SELECT * FROM questions WHERE id = ? 
-        ''',   (q_id)
+        ''',   (q_id,)
         
         ).fetchone()
     if not question:
