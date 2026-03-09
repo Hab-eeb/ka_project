@@ -123,9 +123,37 @@ def save_user_responses(question_id: int, email: str, users_answer:str, is_corre
     conn.commit()
     conn.close()
 
+def reset_user_response(email:str, question_id: int):
+    """ Deletes a user's response for a specific question, allowing them to answer again"""
+
+    conn = sqlite3.connect(DB_NAME)
+    conn.execute('''
+        DELETE FROM user_responses WHERE user_email = ? AND question_id = ?
+    ''', (email, question_id)
+    )
+    conn.commit()
+    conn.close()
+    print(f"Reset: {email} can now re-answer question {question_id}")
+
+def reset_all_user_responses(email:str):
+    """ Deletes ALL responses for a user, resetting their entire history. """
+    conn= sqlite3.connect(DB_NAME)
+    conn.execute('''
+                DELETE FROM user_responses WHERE user_email = ?
+                ''', (email,)
+                 )
+    conn.commit()
+    conn.close()
+
+    print(f"Reset: All responses cleared for {email}")
+
+
+
 if __name__ == "__main__":
     init_db()
     print("DB initialized")
+
+    reset_all_user_responses("agbajeh8@gmail.com") #Uncomment when needed
 
 
 

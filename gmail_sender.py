@@ -1,17 +1,22 @@
 import os
 import json 
 import sqlite3 
+import smtplib
 from dotenv import load_dotenv
-import resend 
+#import resend 
+from email.mime.text import MIMEText
+from email.mime.multipart import MIMEMultipart
+
 
 load_dotenv()
 
-RESEND_API_KEY = os.getenv("RESEND_API_KEY")
-SENDER_EMAIL = os.getenv("SENDER_EMAIL")
+# RESEND_API_KEY = os.getenv("RESEND_API_KEY")
+GMAIL_PASSWORD =os.getenv("GMAIL_PASSWORD")
+GMAIL_USER = os.getenv("SENDER_EMAIL")
 BASE_URL = os.getenv("BASE_URL")
 DB_NAME = os.getenv("DB_NAME")
 
-resend.api_key = RESEND_API_KEY
+# resend.api_key = RESEND_API_KEY
 
 def fetch_question(question_id: int):
     conn = sqlite3.connect(DB_NAME)
@@ -132,33 +137,48 @@ def build_question_email_html(q, recipient_email:str):
     return html 
 
 def send_daily_question(recepient_email: str, question_id:int):
-    if not RESEND_API_KEY:
-        raise RuntimeError("Missing RESEND API KEY env var")
-    
+    # if not RESEND_API_KEY:
+    #     raise RuntimeError("Missing RESEND API KEY env var")
 
     q = fetch_question(question_id)
     if not q:
         raise ValueError(f"Question id ={question_id} not found")
     
 
-    subject = f"KA Daily Question (Day {q['day_number']})" 
-    html = build_question_email_html(q,recepient_email)
+    msg = MIMEMultipart("alternative")
+    msg["Subject"] = f"KA Daily Question (Day {q['day_number']})" 
+    msg["From"] = GMAIL_USER
+    msg["To"] = recepient_email
 
-    #Resend expects: from,to, subject, html/text
-    resp = resend.Emails.send({
-        "from":SENDER_EMAIL,
-        "to": [recepient_email],
-        "subject": subject,
-        "html": html
-    })
+    html_content = build_question_email_html(q,recepient_email)
+    msg.attach(MIMEText(html_content,"html"))
 
-    return resp
+    try:
+        with smtplib.SMTP_SSL("smtp.gmail.com", 465) as server:
+            server.login(GMAIL_USER,GMAIL_PASSWORD)
+            server.send_message(msg)
+        
+        print(f"Email sent to {recepient_email}")
+        return True
+    except Exception as e:
+        print(f"Failed to send email: {e}")
+        return False
+
+    # #Resend expects: from,to, subject, html/text
+    # resp = resend.Emails.send({
+    #     "from":SENDER_EMAIL,
+    #     "to": [recepient_email],
+    #     "subject": subject,
+    #     "html": html
+    # })
+
+    # return resp
 
 
 if __name__ == "__main__":
 
     #Replace with your email and a real question id for testing
-    print(send_daily_question("agbajeh8@gmail.com",37))
+    print(send_daily_question("agbajeh8@gmail.com",39))
 
 
 
