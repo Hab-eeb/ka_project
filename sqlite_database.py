@@ -38,7 +38,8 @@ def init_db():
     ''')
 
     #Table for user responses 
-
+    # cursor.execute("DROP TABLE IF EXISTS user_responses") #for making changes only run once when needed
+    
     cursor.execute('''
         CREATE TABLE IF NOT EXISTS user_responses(
             id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -47,7 +48,8 @@ def init_db():
             selected_option TEXT,
             is_correct BOOLEAN,
             responded_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP, 
-            FOREIGN KEY (question_id) REFERENCES questions (id)                            
+            FOREIGN KEY (question_id) REFERENCES questions (id) ,
+            UNIQUE (question_id,user_email)                          
                    )
     ''')
 

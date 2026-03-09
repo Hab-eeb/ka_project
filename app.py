@@ -47,21 +47,28 @@ def check_answer():
     #6 Compare full text 
     is_correct = (user_answer_text == question['correct_answer'])
 
-    # Save the response into the db 
-    conn.execute ('''
-        INSERT INTO user_responses (question_id, user_email, selected_option, is_correct) 
-        VALUES (?,?,?,?)
-        ''' , (q_id,user_email,user_answer_text,is_correct)
-                  )
 
-    conn.commit()
-    conn.close()
+    # Save the response into the db and handle duplicate attempt
+
+    try:
+        conn.execute ('''
+            INSERT INTO user_responses (question_id, user_email, selected_option, is_correct) 
+            VALUES (?,?,?,?)
+            ''' , (q_id,user_email,user_answer_text,is_correct)
+                    )
+        conn.commit()
+        already_answered = False
+    except sqlite3.IntegrityError:
+        already_answered = True
+    finally :
+        conn.close()
 
     return render_template('result.html',
                            is_correct = is_correct,
                            correct_answer = question['correct_answer'],
                            explanation = question['explanation'],
-                           user_answer = user_answer_text
+                           user_answer = user_answer_text, 
+                           already_answered = already_answered
                            )
 
 

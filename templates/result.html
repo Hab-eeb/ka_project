@@ -14,7 +14,14 @@
 
 <body>
     <div class="box">
-        {% if is_correct %} 
+        {% if already_answered %}
+            <!-- Duplicate Check-->
+             <h1 style ="color: orange;"> Already Answered ⚠️</h1>
+             <p > You have submitted a response already. </p>
+             <p>Your original answer has been recorded </p>
+
+
+        {% elif is_correct %} 
             <h1 class="correct"> Correct! ✅</h1>
             <p>Your answer : <strong> {{user_answer}}</strong> is correct. Well Done!!! </p>
         {% else %}
@@ -32,6 +39,8 @@
         <p><em>Your response has been saved</em></p>
 
     </div>
+    <br>
+        <p><em>KA Project. Knowledge Assesment</em></p>
 </body>
 
 </html>
