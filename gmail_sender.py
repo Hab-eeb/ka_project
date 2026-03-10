@@ -7,6 +7,8 @@ from dotenv import load_dotenv
 from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
 
+from sqlite_database import  get_question_for_user_day, increment_user_day
+
 
 load_dotenv()
 
@@ -136,15 +138,23 @@ def build_question_email_html(q, recipient_email:str):
 
     return html 
 
-def send_daily_question(recepient_email: str, question_id:int):
-    # if not RESEND_API_KEY:
-    #     raise RuntimeError("Missing RESEND API KEY env var")
+def send_daily_question(recepient_email: str):
+    """ 
+        Orchestrates the daily send or a specific user:
+        1. Fetches the question for their urrent day 
+        2. Sends email
+        3. Increment their day in the DB
 
-    q = fetch_question(question_id)
+    """
+    #Fetch question by user email 
+    q = get_question_for_user_day(recepient_email) 
+
     if not q:
-        raise ValueError(f"Question id ={question_id} not found")
+        print(f"No question found for {recepient_email}. They might be finished or not registered")
+        return False
     
 
+    #Prepare the email 
     msg = MIMEMultipart("alternative")
     msg["Subject"] = f"KA Daily Question (Day {q['day_number']})" 
     msg["From"] = GMAIL_USER
@@ -153,15 +163,17 @@ def send_daily_question(recepient_email: str, question_id:int):
     html_content = build_question_email_html(q,recepient_email)
     msg.attach(MIMEText(html_content,"html"))
 
+    # Send via smtp 
     try:
         with smtplib.SMTP_SSL("smtp.gmail.com", 465) as server:
             server.login(GMAIL_USER,GMAIL_PASSWORD)
             server.send_message(msg)
         
-        print(f"Email sent to {recepient_email}")
+        increment_user_day(recepient_email)
+        print(f"Email sent to {recepient_email} (Day {q['day_number']})")
         return True
     except Exception as e:
-        print(f"Failed to send email: {e}")
+        print(f"Failed to send email to {recepient_email}: {e}")
         return False
 
     # #Resend expects: from,to, subject, html/text
@@ -178,7 +190,7 @@ def send_daily_question(recepient_email: str, question_id:int):
 if __name__ == "__main__":
 
     #Replace with your email and a real question id for testing
-    print(send_daily_question("agbajeh8@gmail.com",39))
+    print(send_daily_question("agbajeh8@gmail.com"))
 
 
 

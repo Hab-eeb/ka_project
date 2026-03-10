@@ -211,10 +211,112 @@ def register_user(email: str, curriculum_id: int):
 
     print(f"User {email} registered to the curriculum {curriculum_id}")
 
+def get_active_users():
+    """Returns a list of all active users and their current day"""
+
+    conn = sqlite3.connect(DB_NAME)
+    conn.row_factory = sqlite3.Row
+    users = conn.execute('''
+            SELECT email, current_day FROM users WHERE is_active = 1
+            ''').fetchall()
+    conn.close()
+    return [dict(u) for u in users]
+
+def get_question_for_user_day(email:str):
+    """ Fetches the question for the user's current day based on their curriculum"""
+
+    conn = sqlite3.connect(DB_NAME)
+    conn.row_factory = sqlite3.Row
+
+    query = """
+        SELECT q.* 
+        FROM questions q
+        JOIN curriculums c ON q.corpus_id = c.corpus_id
+        JOIN users u ON u.curriculum_id = c.id
+        WHERE u.email = ? AND q.day_number = u.current_day
+        LIMIT 1
+        """
+    question = conn.execute(query,(email,)).fetchone()
+    conn.close()
+    return dict(question) if question else None
+
+def increment_user_day(email:str):
+    """ Moves the user forward to the next day in their curriculum, deactivates if curriculum is complete"""
+    conn = sqlite3.connect(DB_NAME)
+    conn.row_factory = sqlite3.Row 
+    #Fetch the current day and total days 
+    row = conn.execute('''
+            SELECT u.current_day, c.total_days
+            FROM users u
+            JOIN curriculums c ON u.curriculum_id = c.id
+            WHERE u.email = ?
+        ''', (email,)
+        ).fetchone()
+    
+    if not row:
+        conn.close()
+        print(f"User {email} not found")
+        return 
+    
+    if row['current_day'] >= row['total_days']:
+
+        #They just completed the last day - deactivate 
+        conn.execute('''
+                UPDATE users SET is_active = 0 WHERE email = ?
+            ''', (email,))
+        conn.commit()
+        conn.close()
+        print(f"{email} has completed the curriculum! Marked as inactive.")
+
+    else:
+        conn.execute('''
+                UPDATE users SET current_day = current_day + 1 WHERE email = ?
+            ''', (email,)
+                    )
+        
+        conn.commit()
+        conn.close()
+        print(f"{email} moved to day {row['current_day'] + 1}")
 
 
+def get_existing_corpus_id(topic:str):
+    """ Checks if a topic already exists and returns its corpus id"""
+
+    conn = sqlite3.connect(DB_NAME)
+    conn.row_factory = sqlite3.Row
+    row = conn.execute('''
+            SELECT id FROM corpus WHERE topic = ?
+        ''', (topic,)
+                       ).fetchone()
+    conn.close()
+
+    return row[0] if row else None
 
 
+def delete_user(email: str):
+    """ Removes a user and their response history from the database. """
+    conn = sqlite3.connect(DB_NAME)
+    conn.execute('DELETE FROM user_responses WHERE user_email = ?', (email,))
+    conn.execute('DELETE FROM users WHERE email = ?', (email,))
+    conn.commit()
+    conn.close()
+    print(f"🗑️ User {email} deleted.")
+
+def get_existing_user(email:str):
+    """ Checks if a topic already exists and returns its corpus id"""
+
+    conn = sqlite3.connect(DB_NAME)
+    conn.row_factory = sqlite3.Row
+    row = conn.execute('''
+            SELECT id FROM users WHERE email = ?
+        ''', (email,)
+                       ).fetchone()
+    conn.close()
+
+    if row :
+        return True
+    else :
+        return False
 
 
 
@@ -225,6 +327,7 @@ if __name__ == "__main__":
     print("DB initialized")
 
     #reset_all_user_responses("agbajeh8@gmail.com") #Uncomment when needed
+    delete_user("agbajeh8@gmail.com") #Uncomment when needed
 
 
 
