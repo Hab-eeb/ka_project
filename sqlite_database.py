@@ -327,7 +327,7 @@ if __name__ == "__main__":
     print("DB initialized")
 
     #reset_all_user_responses("agbajeh8@gmail.com") #Uncomment when needed
-    delete_user("agbajeh8@gmail.com") #Uncomment when needed
+    #delete_user("agbajeh8@gmail.com") #Uncomment when needed
 
 
 

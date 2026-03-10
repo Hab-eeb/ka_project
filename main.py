@@ -66,7 +66,7 @@ def daily_sending():
 
 if __name__ == "__main__":
     #Setup new user/ topic
-    creation_pipeline("Teaching", "agbajeh8@gmail.com")
+    #creation_pipeline("Teaching", "user@gmail.com")
 
     #Run the daily send for everyone
     daily_sending()
