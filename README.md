@@ -136,28 +136,36 @@ DB_NAME=ka_data.db
 
 #### Running locally (typical)
 
-1. Install dependencies:
+1. Create and activate a virtual environment:
+
+```bash
+python -m venv venv
+source venv/bin/activate        # Mac/Linux
+venv\Scripts\activate           # Windows
+```
+
+2. Install dependencies:
 
 ```bash
 pip install google-genai pydantic flask python-dotenv
 ```
 
-2. Set environment variables in `.env`.
+3. Set environment variables in `.env`.
 
-3. Generate curriculum + register a user  
+4. Generate curriculum + register a user  
    In `main.py`, uncomment `creation_pipeline(topic, email)` and run:
 
 ```bash
 python main.py
 ```
 
-4. Run the Flask app (answer endpoint):
+5. Run the Flask app (answer endpoint):
 
 ```bash
 python app.py
 ```
 
-5. Run the daily send  
+6. Run the daily send  
    In `main.py`, comment out `creation_pipeline` and ensure `daily_sending()` is active, then:
 
 ```bash
