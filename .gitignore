@@ -12,8 +12,6 @@ env/
 # Database
 *.db
 
-#Data files 
-*.json
-*.md
-*.txt
-*.db
+# IDE
+.vscode/
+.idea/

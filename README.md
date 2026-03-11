@@ -147,29 +147,43 @@ venv\Scripts\activate           # Windows
 2. Install dependencies:
 
 ```bash
-pip install google-genai pydantic flask python-dotenv
+pip install -r requirements.txt
 ```
 
-3. Set environment variables in `.env`.
-
-4. Generate curriculum + register a user  
-   In `main.py`, uncomment `creation_pipeline(topic, email)` and run:
+3. Copy `.env.example` to `.env` and fill in your credentials:
 
 ```bash
-python main.py
+cp .env.example .env
 ```
 
-5. Run the Flask app (answer endpoint):
+4. Initialize the database:
+
+```bash
+python main.py init-db
+```
+
+5. Generate a curriculum and register a user:
+
+```bash
+python main.py generate --topic "Machine Learning" --email user@gmail.com
+```
+
+6. Run the Flask app (answer endpoint):
 
 ```bash
 python app.py
 ```
 
-6. Run the daily send  
-   In `main.py`, comment out `creation_pipeline` and ensure `daily_sending()` is active, then:
+7. Send daily questions to all active users:
 
 ```bash
-python main.py
+python main.py send
+```
+
+8. Delete a user (for re-registration with a new topic):
+
+```bash
+python main.py delete-user --email user@gmail.com
 ```
 
 #### ✅ MVP behavior / constraints
@@ -179,7 +193,13 @@ python main.py
 
 #### 🧹 Cleanup utilities (DB)
 
-Helper functions are available in `sqlite_database.py` to delete a user and their response history, allowing re-registration with a new topic during testing.
+Use the CLI to delete a user and their response history, allowing re-registration with a new topic:
+
+```bash
+python main.py delete-user --email user@gmail.com
+```
+
+Additional helper functions are available in `sqlite_database.py` for resetting individual or all responses during testing.
 
 #### Roadmap
 

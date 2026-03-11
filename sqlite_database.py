@@ -142,7 +142,7 @@ def save_user_responses(question_id: int, email: str, users_answer:str, is_corre
     cursor = conn.cursor()
 
     cursor.execute('''
-        INSERT INTO user_response (question_id,user_email, selected_option, is_correct)
+        INSERT INTO user_responses (question_id,user_email, selected_option, is_correct)
         VALUES (?,?,?,?)''', 
         (question_id,email,users_answer,is_correct)
     )
