@@ -1,7 +1,11 @@
 import sqlite3
 import json 
+from dotenv import load_dotenv
+import os 
 
-DB_NAME = 'ka_data.db'
+load_dotenv()
+DB_NAME = os.getenv("DB_NAME")
+
 
 def init_db():
     """ Run this once to create tables."""

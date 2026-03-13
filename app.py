@@ -1,9 +1,14 @@
 from flask import Flask, request, render_template
 import sqlite3
 import json 
+from dotenv import load_dotenv
+import os 
+
+load_dotenv()
+DB_NAME = os.getenv("DB_NAME")
 
 app = Flask(__name__)
-DB_NAME = "ka_data.db"
+
 
 def get_db_connection():
     conn = sqlite3.connect(DB_NAME)
