@@ -1,14 +1,13 @@
 from flask import Flask, request, render_template
 import sqlite3
 import json 
+import os
 from dotenv import load_dotenv
-import os 
 
 load_dotenv()
-DB_NAME = os.getenv("DB_NAME")
 
 app = Flask(__name__)
-
+DB_NAME = os.getenv("DB_NAME", "ka_data.db")
 
 def get_db_connection():
     conn = sqlite3.connect(DB_NAME)
@@ -41,25 +40,34 @@ def check_answer():
 
     #4 Map the letter (A,B,C,D) to the list index (0,1,2,3)
     letter_to_index = {'A': 0, 'B':1, 'C': 2, 'D':3}
-    index = letter_to_index.get(user_answer)
+    user_index = letter_to_index.get(user_answer)
 
-    #5 Get the actual answer
-    if index is not None and index < len(options_list):
-        user_answer_text = options_list[index]
+    #5 Get the user answer text
+    if user_index is not None and user_index < len(options_list):
+        user_answer_text = options_list[user_index]
     else:
         return "Invalid Choice", 400
     
-    #6 Compare full text 
-    is_correct = (user_answer_text == question['correct_answer'])
+    #6 Compare by index 
+    correct_index = question['correct_answer_index']
 
+    if correct_index is not None and correct_index >= 0:
+        # Use index-based comparison (preferred)
+        is_correct = (user_index == correct_index)
+        correct_answer_text = options_list[correct_index] if correct_index < len(options_list) else question['correct_answer']
+    else:
+        # Fallback to text comparison for questions without correct_answer_index
+        is_correct = (user_answer_text == question['correct_answer'])
+        correct_answer_text = question['correct_answer']
+    
+    
 
     # Save the response into the db and handle duplicate attempt
-
     try:
         conn.execute ('''
             INSERT INTO user_responses (question_id, user_email, selected_option, is_correct) 
             VALUES (?,?,?,?)
-            ''' , (q_id,user_email,user_answer_text,is_correct)
+            ''' , (q_id, user_email, user_answer_text, is_correct)
                     )
         conn.commit()
         already_answered = False
@@ -70,7 +78,7 @@ def check_answer():
 
     return render_template('result.html',
                            is_correct = is_correct,
-                           correct_answer = question['correct_answer'],
+                           correct_answer = correct_answer_text,
                            explanation = question['explanation'],
                            user_answer = user_answer_text, 
                            already_answered = already_answered
@@ -79,4 +87,3 @@ def check_answer():
 
 if __name__ == '__main__':
     app.run(debug =True, port =5000)
-

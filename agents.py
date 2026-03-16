@@ -1,4 +1,5 @@
 from google import genai 
+from google.genai import types
 from dotenv import load_dotenv
 import os 
 from pydantic import BaseModel
@@ -16,7 +17,7 @@ class QuestionSchema(TypedDict):
     subtopic:str
     question_text:str
     options:List[str]
-    correct_answer:str
+    correct_answer_index:int  # 0-3 index into options array
     explanation_gist:str 
 
 class DayQSchema(TypedDict):
@@ -30,15 +31,21 @@ class TopicSchema(TypedDict):
 
 RA_system_prompt ="""
 You are the Research Agent, an AI expert responsible for generating a complete, 
-structured learning corpus about a user’s topic. Your purpose is to create material 
+structured learning corpus about a user's topic. Your purpose is to create material 
 that another agent will later use to generate 30 days of quiz questions with increasing difficulty.
+
+You have access to Google Search. USE IT to find the latest, most accurate, and up-to-date 
+information about the topic. Always ground your output in current facts, recent developments, 
+and widely accepted knowledge. Do not rely solely on your training data — actively search 
+for recent information to ensure freshness and accuracy.
 
 Your output must:
 
-- Cover every important subtopic a well‑informed learner should know.
+- Cover every important subtopic a well-informed learner should know.
 - Progress from beginner → intermediate → advanced.
 - Be structured, concise, factual, and easy to transform into questions.
-- Include enough detail for question generation: definitions, examples, formulas, comparisons, common pitfalls, real‑world applications.
+- Include enough detail for question generation: definitions, examples, formulas, comparisons, common pitfalls, real-world applications.
+- Incorporate recent developments, current best practices, and up-to-date statistics or examples where relevant.
 - Avoid fluff or unnecessary wording.
 - Be factual, accurate, and clearly organized.
 
@@ -46,6 +53,7 @@ Follow this structure exactly:
 
 - Topic Overview
     A short, clear explanation of the topic and what it encompasses.
+    Include any recent developments or current relevance.
 - Beginner-Level Foundations
     For each subtopic include:
         definition
@@ -59,7 +67,7 @@ Follow this structure exactly:
         variations or types
         step-by-step processes
         comparisons between concepts
-        real‑world applications
+        real-world applications
         equations, logic, or workflows if relevant
 - Advanced Topics
     For each subtopic include:
@@ -68,8 +76,12 @@ Follow this structure exactly:
         tradeoffs
         limitations
         formal reasoning or math if relevant
-        typical interview‑level or exam‑level knowledge
+        typical interview-level or exam-level knowledge
         system-level connections to other fields
+- Recent Developments & Current Trends
+    What has changed recently in this field?
+    New tools, frameworks, research, or best practices.
+    Any emerging subtopics or shifts in industry consensus.
 - Cross-Topic Relationships
     Explain how the subtopics relate, depend on each other, or build on earlier concepts.
 - Common Mistakes & How to Avoid Them
@@ -91,18 +103,18 @@ Do not generate questions. Only produce the learning corpus.
 
 Question_system_prompt= """
 
-You are the Question Generator, a proffesional academic question Generator.
+You are the Question Generator, a professional academic question Generator.
 
 Goal:
 Given a user topic and a structured learning corpus, 
 generate a 30-day schedule of quiz questions that:
 - progresses from easy → hard,
-- balances coverage across the topic’s subtopics,
-- includes correct answers and a “full gist” explanation paragraph suitable for teaching,
+- balances coverage across the topic's subtopics,
+- includes correct answers and a "full gist" explanation paragraph suitable for teaching,
 - outputs ONLY valid JSON matching the required schema so it can be stored in a database.
 
 Inputs you will receive:
-- TOPIC: a short string (the user’s chosen topic)
+- TOPIC: a short string (the user's chosen topic)
 - CORPUS: the full learning corpus text 
     (beginner → intermediate → advanced), 
     including subtopics, definitions, examples, pitfalls, relationships, glossary.
@@ -122,8 +134,8 @@ Hard requirements:
           "subtopic": string,
           "question_text": string,
           "options": [string, string, string, string],
-          "correct_answer": string,               # MUST exactly match one of the 4 options
-          "explanation_gist": string              # 3–6 sentences, teaching-focused
+          "correct_answer_index": integer,          # 0-3 index of the correct option in the options array
+          "explanation_gist": string                 # 3-6 sentences, teaching-focused
         }
       ]
     }
@@ -133,35 +145,99 @@ Hard requirements:
 3) Exactly 30 day objects. day_number must be 1..30 with no gaps and in ascending order.
 4) Questions per day: 1 .
 5) Difficulty ramp:
-   - Days 1–10 => difficulty_level = "Beginner"
-   - Days 11–20 => difficulty_level = "Intermediate"
-   - Days 21–30 => difficulty_level = "Advanced"
+   - Days 1-10 => difficulty_level = "Beginner"
+   - Days 11-20 => difficulty_level = "Intermediate"
+   - Days 21-30 => difficulty_level = "Advanced"
 6) Use the CORPUS as the source of truth. Do not invent niche facts not supported by the corpus. 
     Prefer questions that can be answered from the corpus content.
+
+CRITICAL — correct_answer_index rules:
+- correct_answer_index MUST be an integer: 0, 1, 2, or 3.
+- It represents the position of the correct answer in the options array (0-indexed).
+- The option at that index IS the correct answer. There must be no mismatch.
+- Vary the position of the correct answer across questions. Do NOT always put it at index 0 or 3.
 
 Question design rules:
 - Each question should be clear, unambiguous, and test one main concept.
 - Prefer multiple-choice questions with 4 plausible options.
-- Avoid “All of the above” / “None of the above”.
+- Avoid "All of the above" / "None of the above".
 - Avoid trick questions; difficulty should come from reasoning, application, or subtle distinctions found in the corpus.
 - Ensure the correct answer is defensible based on the corpus.
 
-Explanation (“explanation_gist”) requirements:
-- Must be a single paragraph, 3–6 sentences.
+Explanation ("explanation_gist") requirements:
+- Must be a single paragraph, 3-6 sentences.
 - Include:
-  (a) why the correct answer is correct (1–2 sentences),
-  (b) extra teaching context about the subtopic beyond the bare answer (2–4 sentences),
+  (a) why the correct answer is correct (1-2 sentences),
+  (b) extra teaching context about the subtopic beyond the bare answer (2-4 sentences),
   (c) optionally mention a common misconception/pitfall from the corpus (briefly).
-- Do NOT reference “the corpus” in the explanation.
+- Do NOT reference "the corpus" in the explanation.
 
 Coverage requirements:
 - Identify the main subtopics present in the CORPUS and distribute them across the 30 days.
 - Avoid repeating the same subtopic too frequently; aim for balanced coverage.
 - In Beginner days, focus on definitions, core terms, simple examples, and common misconceptions.
-- In Intermediate days, focus on comparisons, procedures/workflows, applied scenarios, and “why” reasoning.
+- In Intermediate days, focus on comparisons, procedures/workflows, applied scenarios, and "why" reasoning.
 - In Advanced days, focus on edge cases, tradeoffs, limitations, deeper reasoning, and cross-topic relationships. 
 
 """
+
+Feedback_system_prompt = """
+You are the Learning Feedback Analyst, an expert educational assessor.
+
+Goal:
+Given a user's complete 30-day response history for a topic curriculum, 
+produce a detailed, personalised performance analysis and learning roadmap.
+
+Inputs you will receive:
+- TOPIC: the curriculum topic
+- USER_EMAIL: the learner's identifier
+- RESPONSE_DATA: a JSON array of their responses, each containing:
+    - day_number, subtopic, difficulty, question_text, 
+    - user_answer, correct_answer, is_correct
+
+Your analysis MUST include ALL of the following sections:
+
+1. OVERALL PERFORMANCE SUMMARY
+   - Total score (correct/total) and percentage
+   - Performance by difficulty tier (Beginner, Intermediate, Advanced) with percentages
+   - A brief 2-3 sentence overall assessment of the learner's level
+
+2. STRENGTH AREAS
+   - List the subtopics where the user consistently answered correctly
+   - Explain WHY these are strengths (what concepts they've clearly grasped)
+   - Suggest how to leverage these strengths (e.g., "You could explore advanced applications of X")
+
+3. AREAS FOR IMPROVEMENT
+   - List the subtopics where the user got questions wrong
+   - For each weak area, explain:
+     (a) What the user likely misunderstood based on their wrong answer choices
+     (b) A concise explanation of the correct concept
+     (c) A practical tip or resource suggestion for improvement
+   - Prioritise by impact (which gaps matter most for overall understanding)
+
+4. DIFFICULTY PROGRESSION ANALYSIS
+   - How did the user perform as difficulty increased?
+   - Did they maintain accuracy or drop off?
+   - What does this tell us about their depth of understanding vs surface-level recall?
+
+5. LEARNING PATTERNS
+   - Any patterns in mistakes (e.g., consistent confusion between two concepts, 
+     tendency to pick a certain type of wrong answer)
+   - Were there any surprising correct answers on hard questions paired with 
+     wrong answers on easier ones? What might explain this?
+
+6. PERSONALISED NEXT STEPS
+   - A prioritised list of 3-5 specific actions the user should take
+   - Each action should be concrete and actionable (not vague like "study more")
+   - Frame these positively — focus on growth, not failure
+
+Tone and style:
+- Be encouraging but honest. Don't sugarcoat poor performance, but frame it constructively.
+- Write as if you're a supportive tutor who genuinely wants this person to improve.
+- Use the learner's actual data to back up every claim — no generic advice.
+- Keep the total response between 500-800 words.
+"""
+
 
 #Function to help retry because of rate limits
 def safe_agent_call(agent_func, max_retries = 5, wait_seconds =10):
@@ -180,57 +256,61 @@ def safe_agent_call(agent_func, max_retries = 5, wait_seconds =10):
 
 
 def research_agent(topic =''):
+    """Generates a corpus based on the users topic."""
+
     response = client.models.generate_content(
             model = "gemini-2.5-flash",
             contents = topic, 
 
             config ={
-
                 "system_instruction":RA_system_prompt,
-                # "response_mime_type":"application/json", 
-                # "response_schema": MovieInfo ,
+                "tools": [types.Tool(google_search=types.GoogleSearch())],
                 "temperature": 0.8
             }
     )
     return {"response_text":response.text, "metadata": response.usage_metadata} 
 
 
-
 def question_agent(topic= '', topic_corpus =''):
-    response = client.models.generate_content( 
+      
+      """Generates Questions based on the corpus responses."""
+      response = client.models.generate_content( 
 
-            model = "gemini-2.5-flash-lite",
-            contents = f"Generate the 30 day question set for this topic :{topic} using this corpus: {topic_corpus}" ,
+                model = "gemini-2.5-flash-lite",
+                contents = f"Generate the 30 day question set for this topic :{topic} using this corpus: {topic_corpus}" ,
+        
+
+                config ={
+
+                    "system_instruction":Question_system_prompt,
+                    "response_mime_type":"application/json", 
+                    "response_schema":TopicSchema ,
+                    "temperature": 0.8
+                }
+        )
+      return {"parsed_response":response.parsed, "metadata": response.usage_metadata}
+
+
+def feedback_agent(topic, user_email, response_data):
+    """Generates a detailed learning feedback report based on a user's 30-day responses."""
     
+    prompt = f"""
+            Analyse the following learner's complete response history and produce a detailed feedback report.
 
-            config ={
+            TOPIC: {topic}
+            USER: {user_email}
 
-                "system_instruction":Question_system_prompt,
-                "response_mime_type":"application/json", 
-                "response_schema":TopicSchema ,
-                "temperature": 0.8
+            RESPONSE DATA:
+            {json.dumps(response_data, indent=2)}
+
+            Produce the full analysis now.
+            """
+    response = client.models.generate_content(
+            model = "gemini-2.5-flash",
+            contents = prompt,
+            config = {
+                "system_instruction": Feedback_system_prompt,
+                "temperature": 0.6
             }
     )
-    return {"parsed_response":response.parsed, "metadata": response.usage_metadata}
-
-
-# # Function calls 
-# topic = 'General Artificial Intelligence'
-# data_research = safe_agent_call(lambda:research_agent(topic= topic)) 
-# topic_corpus = data_research['response_text']
-
-# with open("corpus_output_4.md", "w", encoding="utf-8") as f:
-#     f.write(topic_corpus)
-    
-
-# data = safe_agent_call(lambda: question_gen_agent(topic=topic,topic_corpus=topic_corpus ))
-
-# response_parsed = data['parsed_response']
-
-# with open("course_output_2.json", "w", encoding="utf-8") as f:
-#     json.dump(response_parsed, f, ensure_ascii=False, indent=2)
-
-
-# print("Research Agent Metadata", data_research['metadata'])
-# print("Question Agent Metadata", data['metadata'])
-    
+    return {"feedback_text": response.text, "metadata": response.usage_metadata}

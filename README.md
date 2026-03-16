@@ -1,105 +1,84 @@
 ### 🧠 Knowledge Agent (KA)
 
-## An AI-Driven Learning Curriculum Generator (WIP)
+## An AI-Driven Learning Curriculum Generator
 
-A modular Python-based pipeline that transforms raw topic data into structured, multi-day learning curriculums and practice questions using the **Google Gemini (new SDK)** — with **SQLite persistence**, **daily email delivery**, and a **Flask endpoint** for answering questions.
+A modular Python-based pipeline that transforms raw topic data into structured, multi-day learning curriculums and practice questions using **Google Gemini (new SDK)** — with **Google Search grounding** for up-to-date content, **SQLite persistence**, **daily email delivery**, a **Flask endpoint** for answering questions, and **AI-powered feedback analysis** after curriculum completion.
 
-#### 🚀 Project overview
+**🔴 Live & Deployed** on PythonAnywhere with automated daily delivery.
+
+**👉 [Sign up here](https://forms.gle/kvrm7mGFfEiqf5Gf9) to try it — pick any topic and start receiving daily questions.**
+
+---
+
+#### 🚀 Project Overview
 
 This project automates the creation + delivery of educational content:
 
-- A corpus (research) agent produces a topic-specific learning corpus.
-- A question-generation agent produces a structured, multi-day curriculum of MCQ-style questions.
+- A **research agent** (with Google Search grounding) produces a topic-specific learning corpus using the latest available information.
+- A **question-generation agent** produces a structured, multi-day curriculum of MCQ-style questions.
 - Outputs are persisted in **SQLite** so every question set can be traced back to the exact corpus version it came from.
-- A daily delivery script fetches the next “Day N” question from the DB (no LLM call) and emails it to the user.
+- A daily delivery script fetches the next "Day N" question from the DB (no LLM call) and emails it to the user.
 - Users answer via email links that hit a Flask `/check` endpoint, which validates + stores responses.
+- After completing 30 days, a **feedback agent** analyses the user's entire response history and generates a personalised learning report.
 
 #### 🌟 Key Features
 
-- **Structured Output**: Uses Gemini’s response schema to ensure the model returns valid, parsable JSON matching the project schema.
-- **Resilient API Calls**: Implements a “Safe Call” wrapper with exponential backoff to handle timeouts and server-side spikes.
+- **Search-Grounded Research**: The research agent uses Google Search to ensure the learning corpus reflects the latest information, not just the LLM's training data.
+- **Structured Output**: Uses Gemini's response schema to ensure the model returns valid, parsable JSON matching the project schema.
+- **Index-Based Answer Validation**: Correct answers are stored as option indices (0-3), eliminating text mismatch issues from LLM generation.
+- **Resilient API Calls**: Implements a "Safe Call" wrapper with exponential backoff to handle timeouts and server-side spikes.
 - **Relational Persistence**: Data is normalized into SQLite (traceability via `corpus_id`).
-- **Daily Delivery (No LLM)**: Daily send selects the appropriate “Day N” question from the database.
+- **Daily Delivery (No LLM)**: Daily send selects the appropriate "Day N" question from the database.
 - **Answer Tracking**: A Flask endpoint records answers and prevents duplicate attempts per user per question.
+- **AI-Powered Feedback**: After completing a curriculum, users receive a detailed analysis of their strengths, weaknesses, and personalised next steps.
 
-#### 🛠️ Tech stack
+#### 🛠️ Tech Stack
 
 - **Python**
 - **Google Gemini** via the new SDK (`from google import genai`)
+- **Google Search** grounding for up-to-date research
 - **SQLite** for persistence (`ka_data.db`)
 - **Flask** (answer submission + result page)
 - **SMTP (Gmail)** for sending daily questions
 - **Structured output** using typed schemas (e.g., `TypedDict`) and JSON
+- **PythonAnywhere** for hosting + scheduled task automation
 
-#### 📂 Repository layout
+#### 📂 Repository Layout
 
-- `main.py` — Orchestrates the workflow:
-  - init DB
-  - generate corpus + questions (if needed)
-  - register users
-  - run daily delivery loop (send to active users)
-- `agents.py` — Agent calls to Gemini + reliability logic (retry/backoff)
-- `sqlite_database.py` — SQLite schema + DB helpers (users, curriculum, “Day N” fetching)
+- `main.py` — CLI entrypoint for all operations:
+  - `generate` — Create a curriculum and register a user
+  - `send` — Send daily questions to all active users
+  - `feedback` — Generate a feedback report for a user
+  - `init-db` — Initialize the database
+  - `delete-user` — Remove a user for re-registration
+- `agents.py` — Agent calls to Gemini: research (with search), question generation, and feedback analysis
+- `sqlite_database.py` — SQLite schema + DB helpers (users, curriculum, responses, feedback)
 - `gmail_sender.py` — Builds + sends daily question emails (fetch → send → increment day)
 - `app.py` — Flask app: `/check?q_id=...&ans=...&user=...` validates answer and saves response
 - `templates/` — HTML templates (e.g. `result.html`)
-- `ka_data.db` — Local SQLite database (generated; should be gitignored)
 
-#### 📊 Data model (high-level)
+#### 📊 Data Model (high-level)
 
 Primary tables:
 
-- `corpus`
-  - `id` (PK)
-  - `topic` (UNIQUE)
-  - `corpus_text`
-  - `created_at`
-
-- `questions`
-  - `id` (PK)
-  - `corpus_id` (FK → `corpus.id`)
-  - `topic`
-  - `day_number`
-  - `difficulty`
-  - `subtopic`
-  - `question_text`
-  - `options` (JSON string)
-  - `correct_answer`
-  - `explanation`
-  - UNIQUE constraint to avoid duplicates per corpus/day/question
-
-- `curriculums`
-  - `id` (PK)
-  - `topic` (UNIQUE)
-  - `corpus_id`
-  - `total_days`
-
-- `users`
-  - `id` (PK)
-  - `email` (UNIQUE)
-  - `curriculum_id`
-  - `start_date`
-  - `current_day`
-  - `is_active`
-
-- `user_responses`
-  - `id` (PK)
-  - `question_id` (FK → `questions.id`)
-  - `user_email`
-  - `selected_option`
-  - `is_correct`
-  - UNIQUE `(question_id, user_email)` to prevent duplicate attempts
+- `corpus` — stores the generated learning material per topic (linked by `corpus_id`)
+- `questions` — 30 days of questions with options, `correct_answer_index`, difficulty, explanations
+- `curriculums` — links a topic to its corpus with total day count
+- `users` — tracks email, curriculum assignment, current day, and active status
+- `user_responses` — stores each answer attempt with correctness (unique per user per question)
+- `feedback_reports` — stores AI-generated feedback after curriculum completion
 
 This design supports:
-- traceable question sets (via `corpus_id`)
-- user progress tracking (via `current_day`)
-- answer tracking + analytics readiness
+- Traceable question sets (via `corpus_id`)
+- User progress tracking (via `current_day`)
+- Answer tracking + analytics readiness
+- Personalised feedback generation
 
-#### ⚙️ How it works (end-to-end)
+#### ⚙️ How It Works (end-to-end)
 
-1. **Generate curriculum (LLM call)**
-   - `research_agent(topic)` → corpus text
-   - `question_agent(topic, corpus)` → structured multi-day questions
+1. **Generate curriculum (LLM + Search)**
+   - `research_agent(topic)` → searches the web + generates corpus text
+   - `question_agent(topic, corpus)` → structured 30-day question set
    - Both are saved into SQLite (linked by `corpus_id`).
 
 2. **Register user**
@@ -111,30 +90,23 @@ This design supports:
 
 4. **User answers via email link**
    - Link hits Flask `/check`
-   - App checks correctness, stores attempt, and renders result + explanation
+   - App checks correctness using index comparison, stores attempt, and renders result + explanation
 
-#### 🔐 Environment variables
+5. **Feedback (after completion)**
+   - After 30 days, run the feedback command to generate a detailed analysis
+   - The feedback agent reviews all responses and produces a personalised learning report
 
-Create a `.env` file (do **not** commit secrets):
+#### 🔐 Environment Variables
+
+Create a `.env` file (do **not** commit secrets). See `.env.example` for the template:
 
 - `GEMINI_API_KEY` — Gemini API key
 - `SENDER_EMAIL` — Gmail address used to send emails
 - `GMAIL_PASSWORD` — Gmail **App Password** (recommended), not your normal password
-- `BASE_URL` — Base URL for answer links (should include `/check`), e.g. `http://127.0.0.1:5000/check`
-- `DB_NAME` — SQLite DB filename/path (e.g. `ka_data.db`)
+- `BASE_URL` — Base URL for answer links (e.g. `https://yourusername.pythonanywhere.com/check`)
+- `DB_NAME` — SQLite DB path (use absolute path in production)
 
-Example:
-
-```bash
-GEMINI_API_KEY=your_key_here
-SENDER_EMAIL=you@gmail.com
-GMAIL_PASSWORD=your_app_password
-BASE_URL=http://127.0.0.1:5000/check
-DB_NAME=ka_data.db 
-
-```
-
-#### Running locally (typical)
+#### Running Locally
 
 1. Create and activate a virtual environment:
 
@@ -180,18 +152,25 @@ python app.py
 python main.py send
 ```
 
-8. Delete a user (for re-registration with a new topic):
+8. Generate feedback for a user (after they've answered questions):
+
+```bash
+python main.py feedback --email user@gmail.com
+```
+
+9. Delete a user (for re-registration with a new topic):
 
 ```bash
 python main.py delete-user --email user@gmail.com
 ```
 
-#### ✅ MVP behavior / constraints
+#### ✅ MVP Behavior / Constraints
 
 - **One user per topic/curriculum**: If a user email is already registered, the generation/register flow stops early — preventing accidental re-generation and unnecessary LLM usage.
 - Users are automatically marked inactive once they reach the end of their curriculum (`total_days`).
+- Feedback can be generated at any point but is most useful after curriculum completion.
 
-#### 🧹 Cleanup utilities (DB)
+#### 🧹 Cleanup Utilities (DB)
 
 Use the CLI to delete a user and their response history, allowing re-registration with a new topic:
 
@@ -201,14 +180,14 @@ python main.py delete-user --email user@gmail.com
 
 Additional helper functions are available in `sqlite_database.py` for resetting individual or all responses during testing.
 
-#### Roadmap
+#### Agents
 
-- Production deployment (Render/Railway) + scheduler automation
-- Better html formatting (responsive design)
-- User learning analytics
-- Admin UI to manage users/topics and resend days
-- Multiple questions per day + spaced repetition
+| Agent | Model | Purpose | Tools |
+|-------|-------|---------|-------|
+| Research Agent | `gemini-2.5-flash` | Generates structured learning corpus | Google Search |
+| Question Agent | `gemini-2.5-flash-lite` | Produces 30-day question curriculum | Structured output schema |
+| Feedback Agent | `gemini-2.5-flash` | Analyses responses and generates learning report | — |
 
 #### Status
 
-Work in progress. Core generation + persistence + traceability are in place; daily delivery and answer tracking are implemented and working locally. Deployment + automation are next.
+Live and deployed. Core generation + persistence + traceability + daily delivery + answer tracking + feedback analysis are all implemented and working in production.

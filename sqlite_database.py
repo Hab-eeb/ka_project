@@ -1,11 +1,8 @@
 import sqlite3
 import json 
-from dotenv import load_dotenv
-import os 
+import os
 
-load_dotenv()
-DB_NAME = os.getenv("DB_NAME")
-
+DB_NAME = os.getenv("DB_NAME", "ka_data.db")
 
 def init_db():
     """ Run this once to create tables."""
@@ -36,6 +33,7 @@ def init_db():
             question_text TEXT,
             options TEXT, --Stored as JSON string
             correct_answer TEXT,
+            correct_answer_index INTEGER DEFAULT -1,
             explanation TEXT, 
             FOREIGN KEY (corpus_id) REFERENCES corpus (id),
             UNIQUE (corpus_id,day_number, question_text)
@@ -43,8 +41,6 @@ def init_db():
     ''')
 
     #Table for user responses 
-    # cursor.execute("DROP TABLE IF EXISTS user_responses") #for making changes only run once when needed
-    
     cursor.execute('''
         CREATE TABLE IF NOT EXISTS user_responses(
             id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -59,7 +55,6 @@ def init_db():
     ''')
 
     #Table for Curriculum link between user, topic and corpus
-
     cursor.execute('''
         CREATE TABLE IF NOT EXISTS curriculums (
                    id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -73,7 +68,6 @@ def init_db():
     ''')
 
     #Table for user - ensuring unique list of users 
-
     cursor.execute('''
             CREATE TABLE IF NOT EXISTS users (
                    id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -86,6 +80,18 @@ def init_db():
                    )
 
                 ''')
+
+    #Table for feedback reports
+    cursor.execute('''
+        CREATE TABLE IF NOT EXISTS feedback_reports(
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            user_email TEXT,
+            topic TEXT,
+            feedback_text TEXT,
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            UNIQUE (user_email, topic)
+                   )
+    ''')
 
     conn.commit()
     conn.close()
@@ -120,19 +126,25 @@ def save_questions_to_db(question_data: dict, corpus_id: int):
         diff_level = day['difficulty_level']
 
         for q in day['questions']:
+            # Get correct answer index and resolve to text
+            correct_idx = q['correct_answer_index']
+            options = q['options']
+            correct_answer_text = options[correct_idx] if 0 <= correct_idx < len(options) else options[0]
+
             cursor.execute('''
             INSERT INTO questions 
-            (corpus_id, topic, day_number, difficulty, subtopic, question_text, options, correct_answer, explanation)
-            VALUES (?,?,?,?,?,?,?,?,?) ''', 
+            (corpus_id, topic, day_number, difficulty, subtopic, question_text, options, correct_answer, correct_answer_index, explanation)
+            VALUES (?,?,?,?,?,?,?,?,?,?) ''', 
             ( 
-                corpus_id, # Foreign Key
+                corpus_id,
                 topic_name,
                 day_num,
                 diff_level,
                 q['subtopic'],
                 q['question_text'],
-                json.dumps(q['options']), # convert list to json string for storage
-                q['correct_answer'],
+                json.dumps(options),
+                correct_answer_text,
+                correct_idx,
                 q['explanation_gist']
             )
                            )
@@ -304,10 +316,10 @@ def delete_user(email: str):
     conn.execute('DELETE FROM users WHERE email = ?', (email,))
     conn.commit()
     conn.close()
-    print(f"🗑️ User {email} deleted.")
+    print(f"User {email} deleted.")
 
 def get_existing_user(email:str):
-    """ Checks if a topic already exists and returns its corpus id"""
+    """ Checks if a user already exists"""
 
     conn = sqlite3.connect(DB_NAME)
     conn.row_factory = sqlite3.Row
@@ -322,16 +334,55 @@ def get_existing_user(email:str):
     else :
         return False
 
+def get_user_responses_for_feedback(email: str):
+    """Fetches all responses for a user with question details for feedback analysis."""
+    
+    conn = sqlite3.connect(DB_NAME)
+    conn.row_factory = sqlite3.Row
+    
+    rows = conn.execute('''
+        SELECT 
+            q.day_number,
+            q.subtopic,
+            q.difficulty,
+            q.question_text,
+            q.options,
+            q.correct_answer,
+            ur.selected_option AS user_answer,
+            ur.is_correct
+        FROM user_responses ur
+        JOIN questions q ON ur.question_id = q.id
+        WHERE ur.user_email = ?
+        ORDER BY q.day_number
+    ''', (email,)).fetchall()
+    
+    conn.close()
+    return [dict(r) for r in rows]
 
+def get_user_topic(email: str):
+    """Returns the topic a user is registered to."""
+    conn = sqlite3.connect(DB_NAME)
+    conn.row_factory = sqlite3.Row
+    row = conn.execute('''
+        SELECT c.topic 
+        FROM users u
+        JOIN curriculums c ON u.curriculum_id = c.id
+        WHERE u.email = ?
+    ''', (email,)).fetchone()
+    conn.close()
+    return row['topic'] if row else None
 
+def save_feedback_report(email: str, topic: str, feedback_text: str):
+    """Saves a feedback report to the database."""
+    conn = sqlite3.connect(DB_NAME)
+    conn.execute('''
+        INSERT OR REPLACE INTO feedback_reports (user_email, topic, feedback_text)
+        VALUES (?, ?, ?)
+    ''', (email, topic, feedback_text))
+    conn.commit()
+    conn.close()
 
 
 if __name__ == "__main__":
     init_db()
     print("DB initialized")
-
-    #reset_all_user_responses("agbajeh8@gmail.com") #Uncomment when needed
-    #delete_user("agbajeh8@gmail.com") #Uncomment when needed
-
-
-
