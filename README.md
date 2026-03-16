@@ -6,7 +6,7 @@ A modular Python-based pipeline that transforms raw topic data into structured, 
 
 **🔴 Live & Deployed** on PythonAnywhere with automated daily delivery.
 
-**👉 [Sign up here](https://forms.gle/kvrm7mGFfEiqf5Gf9) to try it — pick any topic and start receiving daily questions.**
+**👉 [Sign up here](https://forms.gle/kvrm7mGFfEiqf5Gf9) to try it — type in any topic and start receiving daily questions.**
 
 ---
 
