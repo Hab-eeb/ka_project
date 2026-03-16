@@ -5,46 +5,62 @@ from sqlite_database import (init_db, save_questions_to_db,
                                 register_user, get_existing_corpus_id,
                                   get_active_users, get_existing_user,
                                   get_user_responses_for_feedback,
-                                  get_user_topic, save_feedback_report)
+                                  get_user_topic, save_feedback_report, 
+                                  get_questions_count_for_corpus,
+                                  get_corpus_text)
 from gmail_sender import send_daily_question, send_feedback_email
 
 
 
 def creation_pipeline(topic:str, user_email:str):
-    """ Handles Agents, DB Storage and user registration."""
+    """ Handles Agents, DB Storage and user registration.
+        Has checkpoint logic: if corpus exists but questions failed, 
+        it skips research and retries question generation.
+    """
     init_db()
-
+ 
     #Check if user exists
     if get_existing_user(user_email):
         print(f"User {user_email} is already registered to a curriculum.")
         print("To change their topic, run: python main.py delete-user --email <email>")
         return
-
-    #Check if topic exists 
+ 
+    #Step 1: Corpus — check if it already exists
     corpus_id = get_existing_corpus_id(topic)
-
+ 
     if corpus_id:
-        print(f" Topic already exists in DB (ID:{corpus_id}). Skipping AI generation")
+        print(f"Corpus for '{topic}' already exists (ID:{corpus_id}). Skipping research.")
+        topic_corpus = get_corpus_text(corpus_id)
     else:
-
         # Research Agent and saving to DB
-        print(f"Starting research for : {topic}...")
-        data_research = safe_agent_call(lambda : research_agent(topic))
+        print(f"Starting research for: {topic}...")
+        data_research = safe_agent_call(lambda: research_agent(topic))
+        if not data_research:
+            print("Research agent failed after max retries. Try again later.")
+            return
         topic_corpus = data_research['response_text']
-        corpus_id = save_corpus_to_db(topic,topic_corpus)
-        print("Corpus saved")
-
-        #Question Agent and saving to DB
-        print("Generating Questions... ")
+        corpus_id = save_corpus_to_db(topic, topic_corpus)
+        print("Corpus saved.")
+ 
+    #Step 2: Questions — check if they already exist for this corpus
+    q_count = get_questions_count_for_corpus(corpus_id)
+ 
+    if q_count > 0:
+        print(f"Questions already exist ({q_count} found). Skipping generation.")
+    else:
+        print("Generating Questions...")
         data_questions = safe_agent_call(lambda: question_agent(topic, topic_corpus))
+        if not data_questions:
+            print("Question agent failed after max retries. Re-run the same command to retry — corpus is saved.")
+            return 
         parsed_questions = data_questions['parsed_response']
-        save_questions_to_db(parsed_questions,corpus_id) 
-        print("Questions saved")
+        save_questions_to_db(parsed_questions, corpus_id) 
+        print("Questions saved.")
     
-    #User Registration 
+    #Step 3: User Registration 
     curr_id = save_curriculum(topic, corpus_id)
-    register_user(user_email,curr_id)
-    print(f" Setup complete. {user_email} is ready for '{topic}'.")
+    register_user(user_email, curr_id)
+    print(f"Setup complete. {user_email} is ready for '{topic}'.")
 
 
 def daily_sending():
@@ -107,14 +123,14 @@ def main():
         description="KA — Knowledge Agent CLI",
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog="""
-Examples:
-  python main.py generate --topic "Machine Learning" --email user@gmail.com
-  python main.py send
-  python main.py feedback --email user@gmail.com
-  python main.py feedback --email user@gmail.com --send
-  python main.py init-db
-  python main.py delete-user --email user@gmail.com
-        """
+            Examples:
+            python main.py generate --topic "Machine Learning" --email user@gmail.com
+            python main.py send
+            python main.py feedback --email user@gmail.com
+            python main.py feedback --email user@gmail.com --send
+            python main.py init-db
+            python main.py delete-user --email user@gmail.com
+                    """
     )
 
     subparsers = parser.add_subparsers(dest="command", help="Available commands")

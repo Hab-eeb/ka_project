@@ -382,6 +382,25 @@ def save_feedback_report(email: str, topic: str, feedback_text: str):
     conn.commit()
     conn.close()
 
+def get_questions_count_for_corpus(corpus_id: int) -> int:
+    """Returns the number of questions generated for a given corpus."""
+    conn = sqlite3.connect(DB_NAME)
+    count = conn.execute(
+        'SELECT COUNT(*) FROM questions WHERE corpus_id = ?', (corpus_id,)
+    ).fetchone()[0]
+    conn.close()
+    return count
+ 
+def get_corpus_text(corpus_id: int) -> str:
+    """Returns the corpus text for a given corpus ID."""
+    conn = sqlite3.connect(DB_NAME)
+    row = conn.execute(
+        'SELECT corpus_text FROM corpus WHERE id = ?', (corpus_id,)
+    ).fetchone()
+    conn.close()
+    return row[0] if row else None
+ 
+
 
 if __name__ == "__main__":
     init_db()
