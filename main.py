@@ -6,7 +6,7 @@ from sqlite_database import (init_db, save_questions_to_db,
                                   get_active_users, get_existing_user,
                                   get_user_responses_for_feedback,
                                   get_user_topic, save_feedback_report)
-from gmail_sender import send_daily_question
+from gmail_sender import send_daily_question, send_feedback_email
 
 
 
@@ -63,7 +63,7 @@ def daily_sending():
     print(f"Daily Delivery complete. {len(users)} user(s) processed")
 
 
-def generate_feedback(user_email: str):
+def generate_feedback(user_email: str, send_email: bool = False):
     """Generates a detailed feedback report for a user who has completed their curriculum."""
     
     # Get user's topic
@@ -86,14 +86,18 @@ def generate_feedback(user_email: str):
     if result and result.get('feedback_text'):
         # Save to database
         save_feedback_report(user_email, topic, result['feedback_text'])
-        
-        # Also print to console
-        print("\n" + "="*60)
-        print(f"FEEDBACK REPORT: {user_email} — {topic}")
-        print("="*60)
-        print(result['feedback_text'])
-        print("="*60 + "\n")
         print("Feedback saved to database.")
+        
+        if send_email:
+            send_feedback_email(user_email, topic, result['feedback_text'])
+        else:
+            # Print to console
+            print("\n" + "="*60)
+            print(f"FEEDBACK REPORT: {user_email} — {topic}")
+            print("="*60)
+            print(result['feedback_text'])
+            print("="*60 + "\n")
+            print("Use --send to email this report to the user.")
     else:
         print("Failed to generate feedback.")
 
@@ -103,13 +107,14 @@ def main():
         description="KA — Knowledge Agent CLI",
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog="""
-            Examples:
-            python main.py generate --topic "Machine Learning" --email user@gmail.com
-            python main.py send
-            python main.py feedback --email user@gmail.com
-            python main.py init-db
-            python main.py delete-user --email user@gmail.com
-                    """
+Examples:
+  python main.py generate --topic "Machine Learning" --email user@gmail.com
+  python main.py send
+  python main.py feedback --email user@gmail.com
+  python main.py feedback --email user@gmail.com --send
+  python main.py init-db
+  python main.py delete-user --email user@gmail.com
+        """
     )
 
     subparsers = parser.add_subparsers(dest="command", help="Available commands")
@@ -125,6 +130,7 @@ def main():
     # -- feedback: generate learning feedback for a user --
     fb_parser = subparsers.add_parser("feedback", help="Generate a detailed feedback report for a user")
     fb_parser.add_argument("--email", required=True, help="Email of the user to analyse")
+    fb_parser.add_argument("--send", action="store_true", help="Email the feedback report to the user")
 
     # -- init-db: initialize the database --
     subparsers.add_parser("init-db", help="Initialize the SQLite database tables")
@@ -142,7 +148,7 @@ def main():
         daily_sending()
 
     elif args.command == "feedback":
-        generate_feedback(args.email)
+        generate_feedback(args.email, send_email=args.send)
 
     elif args.command == "init-db":
         init_db()
