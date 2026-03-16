@@ -6,7 +6,7 @@ A modular Python-based pipeline that transforms raw topic data into structured, 
 
 **🔴 Live & Deployed** on PythonAnywhere with automated daily delivery.
 
-**👉 [Sign up here](https://forms.gle/kvrm7mGFfEiqf5Gf9) to try it — type in any topic and start receiving daily questions.**
+**👉 [Sign up here](https://forms.gle/kvrm7mGFfEiqf5Gf9) to try it — pick any topic and start receiving daily questions.**
 
 ---
 
@@ -30,7 +30,8 @@ This project automates the creation + delivery of educational content:
 - **Relational Persistence**: Data is normalized into SQLite (traceability via `corpus_id`).
 - **Daily Delivery (No LLM)**: Daily send selects the appropriate "Day N" question from the database.
 - **Answer Tracking**: A Flask endpoint records answers and prevents duplicate attempts per user per question.
-- **AI-Powered Feedback**: After completing a curriculum, users receive a detailed analysis of their strengths, weaknesses, and personalised next steps.
+- **AI-Powered Feedback**: After completing a curriculum, users receive a detailed analysis of their strengths, weaknesses, and personalised next steps — delivered via email or console.
+- **Checkpoint Resilience**: The generation pipeline tracks corpus and question creation independently. If the question agent times out, re-running the same command skips the research and retries only the failed step.
 
 #### 🛠️ Tech Stack
 
@@ -53,7 +54,7 @@ This project automates the creation + delivery of educational content:
   - `delete-user` — Remove a user for re-registration
 - `agents.py` — Agent calls to Gemini: research (with search), question generation, and feedback analysis
 - `sqlite_database.py` — SQLite schema + DB helpers (users, curriculum, responses, feedback)
-- `gmail_sender.py` — Builds + sends daily question emails (fetch → send → increment day)
+- `gmail_sender.py` — Builds + sends daily question emails and feedback reports via Gmail SMTP
 - `app.py` — Flask app: `/check?q_id=...&ans=...&user=...` validates answer and saves response
 - `templates/` — HTML templates (e.g. `result.html`)
 
@@ -80,6 +81,7 @@ This design supports:
    - `research_agent(topic)` → searches the web + generates corpus text
    - `question_agent(topic, corpus)` → structured 30-day question set
    - Both are saved into SQLite (linked by `corpus_id`).
+   - Each step has independent checkpoints — if question generation fails mid-run, re-running the command skips research and retries only the questions.
 
 2. **Register user**
    - User is linked to a curriculum (`users.curriculum_id`) and starts at `current_day = 1`.
@@ -94,7 +96,8 @@ This design supports:
 
 5. **Feedback (after completion)**
    - After 30 days, run the feedback command to generate a detailed analysis
-   - The feedback agent reviews all responses and produces a personalised learning report
+   - The feedback agent reviews all responses and produces a personalised HTML learning report
+   - Use `--send` to email the report directly to the user
 
 #### 🔐 Environment Variables
 
@@ -155,7 +158,11 @@ python main.py send
 8. Generate feedback for a user (after they've answered questions):
 
 ```bash
+# Print feedback to console
 python main.py feedback --email user@gmail.com
+
+# Generate AND email the feedback report to the user
+python main.py feedback --email user@gmail.com --send
 ```
 
 9. Delete a user (for re-registration with a new topic):
