@@ -1,4 +1,5 @@
-from flask import Flask, request, render_template
+import requests
+from flask import Flask, request, render_template, flash, redirect, url_for
 import sqlite3
 import json 
 import os
@@ -8,11 +9,43 @@ load_dotenv()
 
 app = Flask(__name__)
 DB_NAME = os.getenv("DB_NAME", "ka_data.db")
+app.secret_key = os.getenv('FLASK_SECRET_KEY')
+FORM_URL = os.getenv('GOOGLE_FORM_URL')
 
 def get_db_connection():
     conn = sqlite3.connect(DB_NAME)
     conn.row_factory = sqlite3.Row #This allows accessing columns by name 
     return conn
+
+@app.route('/')
+def index():
+    return render_template('index.html', title="Knowledge Agent | Start Learning")
+
+@app.route('/signup', methods=['POST'])
+def signup():
+    topic = request.form.get('topic')
+    email = request.form.get('email')
+
+    # 1. Map your HTML fields to the Google Form Entry IDs
+    form_data = {
+        "entry.567439755": topic,
+        "entry.456320852": email
+    }
+
+    try:
+        # 2. Silently submit the data to Google
+        response = requests.post(FORM_URL, data=form_data)
+        
+        if response.status_code == 200:
+            flash(f"Success! Your 30-day curriculum for '{topic}' is being generated.", "success")
+        else:
+            print(error)
+            flash("Submission failed. Please try again.", "error")
+            
+    except Exception as e:
+        flash(f"An error occurred: {str(e)}", "error")
+
+    return redirect(url_for('index'))
 
 @app.route('/check')
 def check_answer():
