@@ -6,7 +6,7 @@ A modular Python-based pipeline that transforms raw topic data into structured, 
 
 **🔴 Live & Deployed** on PythonAnywhere with automated daily delivery.
 
-**👉 [Sign up here](https://forms.gle/kvrm7mGFfEiqf5Gf9) to try it — type in any topic and start receiving daily questions.**
+**👉 [Try it live](https://habeebagb.pythonanywhere.com) — type in any topic and start receiving daily questions.**
 
 ---
 
@@ -56,7 +56,7 @@ This project automates the creation + delivery of educational content:
 - `sqlite_database.py` — SQLite schema + DB helpers (users, curriculum, responses, feedback)
 - `gmail_sender.py` — Builds + sends daily question emails and feedback reports via Gmail SMTP
 - `app.py` — Flask app: `/check?q_id=...&ans=...&user=...` validates answer and saves response
-- `templates/` — HTML templates (e.g. `result.html`)
+- `templates/` — HTML templates (`index.html` landing page, `result.html` answer feedback)
 
 #### 📊 Data Model (high-level)
 
@@ -84,8 +84,9 @@ This design supports:
    - Each step has independent checkpoints — if question generation fails mid-run, re-running the command skips research and retries only the questions.
 
 2. **Register user**
+   - Users sign up via the landing page with their email and chosen topic
    - User is linked to a curriculum (`users.curriculum_id`) and starts at `current_day = 1`.
-
+   
 3. **Daily delivery (no LLM call)**
    - For each active user, fetch the question for their `current_day`
    - Email it with A/B/C/D links
