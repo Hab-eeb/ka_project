@@ -39,7 +39,6 @@ def signup():
         if response.status_code == 200:
             flash(f"Success! Your 30-day curriculum for '{topic}' is being generated.", "success")
         else:
-            print(error)
             flash("Submission failed. Please try again.", "error")
             
     except Exception as e:
