@@ -258,7 +258,7 @@ def safe_agent_call(agent_func, max_retries = 5, wait_seconds =10):
         try:
             return agent_func()
         except genai.errors.ServerError as e:
-            if e.status_code == 503:
+            if e.code == 503:
                 print(f"Model Overloaded. Attempt {attempt +1}/{max_retries}. Waiting {wait_seconds}s...")
                 time.sleep(wait_seconds)
             else:
