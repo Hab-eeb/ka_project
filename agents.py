@@ -272,7 +272,7 @@ def research_agent(topic =''):
     """Generates a corpus based on the users topic."""
 
     response = client.models.generate_content(
-            model = "gemini-2.5-flash",
+            model = "gemini-3-flash-preview",
             contents = topic, 
 
             config ={
@@ -319,7 +319,7 @@ def feedback_agent(topic, user_email, response_data):
             Produce the full analysis now.
             """
     response = client.models.generate_content(
-            model = "gemini-2.5-flash",
+            model = "gemini-3-flash-preview",
             contents = prompt,
             config = {
                 "system_instruction": Feedback_system_prompt,
