@@ -192,9 +192,9 @@ Additional helper functions are available in `sqlite_database.py` for resetting 
 
 | Agent | Model | Purpose | Tools |
 |-------|-------|---------|-------|
-| Research Agent | `gemini-2.5-flash` | Generates structured learning corpus | Google Search |
+| Research Agent | `gemini-3-flash-preview` | Generates structured learning corpus | Google Search |
 | Question Agent | `gemini-2.5-flash-lite` | Produces 30-day question curriculum | Structured output schema |
-| Feedback Agent | `gemini-2.5-flash` | Analyses responses and generates learning report | — |
+| Feedback Agent | `gemini-3-flash-preview` | Analyses responses and generates learning report | — |
 
 #### Status
 
