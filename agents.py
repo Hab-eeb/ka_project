@@ -7,9 +7,10 @@ from typing import List
 import json 
 from typing_extensions import TypedDict
 import time 
-
+import requests
 
 load_dotenv() #loads env file
+SERPER_API_KEY = os.getenv("SERPER_API_KEY")
 GEM_api_key = os.getenv("GEMINI_API_KEY")
 client = genai.Client(api_key = GEM_api_key)
 
@@ -30,11 +31,12 @@ class TopicSchema(TypedDict):
     days:List[DayQSchema]
 
 RA_system_prompt ="""
+
 You are the Research Agent, an AI expert responsible for generating a complete, 
 structured learning corpus about a user's topic. Your purpose is to create material 
 that another agent will later use to generate 30 days of quiz questions with increasing difficulty.
 
-You have access to Google Search. USE IT to find the latest, most accurate, and up-to-date 
+You have access to web search tool. USE IT to find the latest, most accurate, and up-to-date 
 information about the topic. Always ground your output in current facts, recent developments, 
 and widely accepted knowledge. Do not rely solely on your training data — actively search 
 for recent information to ensure freshness and accuracy.
@@ -98,6 +100,7 @@ Your output must be complete enough that a separate Question Generator Agent cou
 -advanced reasoning questions
 
 Do not generate questions. Only produce the learning corpus.
+
 
 """
 
@@ -268,21 +271,106 @@ def safe_agent_call(agent_func, max_retries = 5, wait_seconds =10):
 
 
 
-def research_agent(topic =''):
-    """Generates a corpus based on the users topic."""
 
+# Define the search tool schema for Gemini
+serper_search_tool = types.Tool(
+    function_declarations=[
+        types.FunctionDeclaration(
+            name="web_search",
+            description="Search the web for current, accurate information about a topic. Use this to find up-to-date facts, definitions, recent developments, and detailed explanations.",
+            parameters=types.Schema(
+                type="OBJECT",
+                properties={
+                    "query": types.Schema(
+                        type="STRING",
+                        description="The search query to look up"
+                    )
+                },
+                required=["query"]
+            )
+        )
+    ]
+)
+
+
+def serper_search(query, num_results=10):
+    """Fetches search results from Serper API."""
+    response = requests.post(
+        "https://google.serper.dev/search",
+        headers={
+            "X-API-KEY": SERPER_API_KEY,
+            "Content-Type": "application/json"
+        },
+        json={"q": query, "num": num_results}
+    )
+    response.raise_for_status()
+    results = response.json()
+
+    # Format into a readable string for the LLM
+    formatted = []
+    for i, item in enumerate(results.get("organic", []), 1):
+        title = item.get("title", "")
+        snippet = item.get("snippet", "")
+        link = item.get("link", "")
+        formatted.append(f"[{i}] {title}\n{snippet}\nSource: {link}")
+    return "\n\n".join(formatted)
+
+
+def research_agent(topic=''):
+    """Generates a corpus based on the user's topic."""
+
+    # Initial request — Gemini decides if/what to search
     response = client.models.generate_content(
-            model = "gemini-3-flash-preview",
-            contents = topic, 
+        model="gemini-3-flash-preview",
+        contents=topic,
+        config={
+            "system_instruction": RA_system_prompt,
+            "tools": [serper_search_tool],
+            "temperature": 0.8
+        }
+    )
 
-            config ={
-                "system_instruction":RA_system_prompt,
-                "tools": [types.Tool(google_search=types.GoogleSearch())],
+    # Tool-use loop: keep going while Gemini wants to search
+    while response.candidates[0].content.parts:
+        # Check if any part is a function call
+        function_calls = [
+            part for part in response.candidates[0].content.parts
+            if part.function_call
+        ]
+
+        if not function_calls:
+            break  # No more tool calls, we have the final text
+
+        # Process each function call
+        function_responses = []
+        for fc in function_calls:
+            query = fc.function_call.args.get("query", topic)
+            print(f"Serper search: '{query}'")
+            search_results = serper_search(query)
+
+            function_responses.append(
+                types.Part.from_function_response(
+                    name="web_search",
+                    response={"result": search_results}
+                )
+            )
+
+        # Send results back to Gemini to continue
+        response = client.models.generate_content(
+            model="gemini-3-flash-preview",
+            contents=[
+                types.Content(role="user", parts=[types.Part.from_text(text=topic)]),
+                response.candidates[0].content,  # assistant's tool call turn
+                types.Content(role="user", parts=function_responses)  # tool results
+            ],
+            config={
+                "system_instruction": RA_system_prompt,
+                "tools": [serper_search_tool],
                 "temperature": 0.8
             }
-    )
-    return {"response_text":response.text, "metadata": response.usage_metadata} 
+        )
 
+    return {"response_text": response.text, "metadata": response.usage_metadata}
 
 def question_agent(topic= '', topic_corpus =''):
       
